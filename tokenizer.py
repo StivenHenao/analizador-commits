@@ -5,10 +5,10 @@ DFA implementado con re (módulo estándar de Python). Las categorías
 se prueban en orden de prioridad; la primera que coincide gana.
 
 5-tupla formal:
-  Q  = {q0, q_verbo, q_prep, q_conj, q_sust, q_unk}
+  Q  = {q0, q_verbo, q_prep_comp, q_prep_loc, q_det, q_conj, q_sust, q_unk}
   Σ  = palabras en minúsculas (tokens separados por espacios)
   q0 = q0
-  F  = {q_verbo, q_prep, q_conj, q_sust}
+  F  = {q_verbo, q_prep_comp, q_prep_loc, q_det, q_conj, q_sust}
   δ  = función de transición definida por las reglas RE en REGLAS
 """
 
@@ -27,15 +27,19 @@ VERBOS = (
     "implementa|modifica|mueve|renombra"
 )
 
-PREPS = "en|de|del|al|para|con|sobre|desde|hacia|por|a|el|la|los|las|un|una"
+PREPS_COMP = r"de|del|al|para|con|por|a"
+PREPS_LOC  = r"en|sobre|desde|hacia"
+DETS       = r"el|la|los|las|un|una"
 
 CONJS = r"\by\b|\bo\b|\be\b|\bu\b"
 
 REGLAS = [
-    ("VERBO", re.compile(rf"\b({VERBOS})\b", re.IGNORECASE)),
-    ("PREP",  re.compile(rf"\b({PREPS})\b",  re.IGNORECASE)),
-    ("CONJ",  re.compile(CONJS,              re.IGNORECASE)),
-    ("SUST",  re.compile(r"\b\w[\w\-]*\b")),  # patrón residual
+    ("VERBO",     re.compile(rf"\b({VERBOS})\b",     re.IGNORECASE)),
+    ("PREP_COMP", re.compile(rf"\b({PREPS_COMP})\b", re.IGNORECASE)),
+    ("PREP_LOC",  re.compile(rf"\b({PREPS_LOC})\b",  re.IGNORECASE)),
+    ("DET",       re.compile(rf"\b({DETS})\b",       re.IGNORECASE)),
+    ("CONJ",      re.compile(CONJS,                  re.IGNORECASE)),
+    ("SUST",      re.compile(r"\b\w[\w\-]*\b")),     # patrón residual
 ]
 
 
@@ -50,7 +54,7 @@ def _normalizar(texto: str) -> str:
 def tokenizar(mensaje: str) -> list[tuple[str, str]]:
     """
     Recibe un mensaje de commit en español y devuelve una lista de
-    (palabra_original, categoria) donde categoria ∈ {VERBO, PREP, CONJ, SUST}.
+    (palabra_original, categoria) donde categoria ∈ {VERBO, PREP_COMP, PREP_LOC, DET, CONJ, SUST}.
 
     El tokenizador es un DFA: cada palabra pasa por las transiciones en
     orden; la primera regla que coincide determina el estado aceptor.
