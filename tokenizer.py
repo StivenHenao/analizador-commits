@@ -14,6 +14,7 @@ se prueban en orden de prioridad; la primera que coincide gana.
 
 import re
 import sys
+import unicodedata
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -27,7 +28,7 @@ VERBOS = (
     "implementa|modifica|mueve|renombra"
 )
 
-PREPS_COMP = r"de|del|al|para|con|por|a"
+PREPS_COMP = r"del|de|al|para|con|por|a"
 PREPS_LOC  = r"en|sobre|desde|hacia"
 DETS       = r"el|la|los|las|un|una"
 
@@ -51,6 +52,14 @@ def _normalizar(texto: str) -> str:
     return texto
 
 
+def _sin_tilde(palabra: str) -> str:
+    """Elimina tildes convirtiendo a NFD y descartando caracteres de categoría Mn."""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", palabra)
+        if unicodedata.category(c) != "Mn"
+    )
+
+
 def tokenizar(mensaje: str) -> list[tuple[str, str]]:
     """
     Recibe un mensaje de commit en español y devuelve una lista de
@@ -65,8 +74,9 @@ def tokenizar(mensaje: str) -> list[tuple[str, str]]:
 
     for palabra in palabras:
         categoria = "UNK"
+        palabra_cmp = _sin_tilde(palabra)
         for cat, patron in REGLAS:
-            if patron.fullmatch(palabra):
+            if patron.fullmatch(palabra_cmp):
                 categoria = cat
                 break
         tokens.append((palabra, categoria))
@@ -83,6 +93,8 @@ if __name__ == "__main__":
         "agrega validación de correo en el módulo de registro",
         "corrige error",
         "actualiza estilos y corrige bug en login",
+        "elimina del archivo las dependencias obsoletas",
+        "agrÉga soporte para tildes en verbos",
     ]
 
     for msg in ejemplos:
