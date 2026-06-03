@@ -1,47 +1,52 @@
 """
-Gramática libre de contexto (CFG) para mensajes de commit de git.
-Especifica las producciones que el analizador CYK utiliza para
-construir árboles de derivación.
+Gramática de contexto libre para mensajes de commit en español.
 
-No terminales: COMMIT, SIMPLE, ACCION, OBJETO, UBICACION
-Terminales   : VERBO, SUST, PREP_COMP, PREP_LOC, DET, CONJ
+G = (V, T, P, S) donde:
+  V = {COMMIT, SIMPLE, ACCION, OBJETO, UBICACION}
+  T = {VERBO, SUST, PREP_COMP, PREP_LOC, DET, CONJ}
+  S = COMMIT
+  P = producciones listadas en GRAMATICA
 
+Los terminales son las categorías que produce el tokenizador (DFA).
+Separar PREP_COMP (de/del) de PREP_LOC (en/a/para/...) elimina la
+ambigüedad espuria entre objeto compuesto y ubicación.
 """
 
-# ---------------------------------------------------------------------------
-# Producciones de la gramática.
-# Cada entrada: NoTerminal → lista de producciones (cada producción es
-# una lista de símbolos terminales y/o no terminales).
-# ---------------------------------------------------------------------------
-
-GRAMATICA: dict[str, list[list[str]]] = {
-
-    # Símbolo inicial.
+GRAMATICA = {
+    # Punto de entrada.
+    # COMMIT → SIMPLE CONJ COMMIT es right-recursive → sin left recursion.
     'COMMIT': [
-        ['SIMPLE', 'CONJ', 'COMMIT'],
+        ['SIMPLE', 'CONJ', 'COMMIT'],   # "corrige X y agrega Y en Z"
         ['SIMPLE'],
     ],
 
-    # Una acción con o sin ubicación.
+    # Commit simple: acción con o sin ubicación.
+    # Un commit sin UBICACION se considera incompleto (lo detecta el analyzer).
     'SIMPLE': [
+        ['ACCION', 'UBICACION'],
         ['ACCION'],
     ],
 
-    # Núcleo verbal del mensaje.
+    # Acción: verbo + objeto, opcionalmente coordinado con otra acción.
+    # Esta producción compuesta genera el Árbol 2 del caso ambiguo.
     'ACCION': [
-        ['VERBO', 'SUST'],
-        ['VERBO'],
+        ['VERBO', 'OBJETO', 'CONJ', 'ACCION'],  # "actualiza X y corrige Y"
+        ['VERBO', 'OBJETO'],
     ],
 
-    # Objeto directo del verbo.
+    # Objeto directo: sustantivo con o sin complemento de PREP_COMP (de/del).
+    # Solo PREP_COMP puede aparecer aquí → "bug en login" NO parsea como objeto.
     'OBJETO': [
-        ['SUST', 'PREP_COMP', 'SUST'],
+        ['SUST', 'PREP_COMP', 'SUST'],   # "validación de correo"
         ['SUST'],
     ],
 
-    # Ubicación del cambio (sin artículo DET).
+    # Ubicación del cambio dentro del sistema.
+    # Siempre empieza con PREP_LOC; el artículo DET es opcional.
     'UBICACION': [
-        ['PREP_LOC', 'SUST', 'PREP_COMP', 'SUST'],
-        ['PREP_LOC', 'SUST'],
+        ['PREP_LOC', 'DET', 'SUST', 'PREP_COMP', 'SUST'],  # "en el módulo de registro"
+        ['PREP_LOC', 'DET', 'SUST'],                         # "en el módulo"
+        ['PREP_LOC', 'SUST', 'PREP_COMP', 'SUST'],          # "en módulo de registro"
+        ['PREP_LOC', 'SUST'],                                # "en login"
     ],
 }
