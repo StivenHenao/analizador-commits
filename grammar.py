@@ -3,12 +3,9 @@ Gramática libre de contexto (CFG) para mensajes de commit de git.
 Especifica las producciones que el analizador CYK utiliza para
 construir árboles de derivación.
 
-No terminales: COMMIT, SIMPLE, ACCION
+No terminales: COMMIT, SIMPLE, ACCION, OBJETO, UBICACION
 Terminales   : VERBO, SUST, PREP_COMP, PREP_LOC, DET, CONJ
 
-Esta versión inicial define únicamente COMMIT, SIMPLE y ACCION.
-Las producciones de OBJETO y UBICACION se agregan en commits
-posteriores.
 """
 
 # ---------------------------------------------------------------------------
@@ -33,5 +30,17 @@ GRAMATICA: dict[str, list[list[str]]] = {
     'ACCION': [
         ['VERBO', 'SUST'],
         ['VERBO'],
+    ],
+
+    # Objeto directo del verbo.
+    'OBJETO': [
+        ['SUST', 'PREP_COMP', 'SUST'],
+        ['SUST'],
+    ],
+
+    # Ubicación del cambio (sin artículo DET).
+    'UBICACION': [
+        ['PREP_LOC', 'SUST', 'PREP_COMP', 'SUST'],
+        ['PREP_LOC', 'SUST'],
     ],
 }
