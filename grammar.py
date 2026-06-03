@@ -18,6 +18,7 @@ GRAMATICA: dict[str, list[list[str]]] = {
 
     # Símbolo inicial.
     'COMMIT': [
+        ['SIMPLE', 'CONJ', 'COMMIT'],
         ['SIMPLE'],
     ],
 
