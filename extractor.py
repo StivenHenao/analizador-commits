@@ -1,6 +1,11 @@
 """
 Extractor de componentes semánticos de un árbol de derivación.
 
+Implementa DCG/Unificación del estilo de Ejercicio_DCGs.py:
+- unificar()     → misma función de la profesora, aplicada a componentes de commit
+- LEXICO_VERBOS  → DAG de cada verbo: {accion, tipo}
+- extraer()      → recorre el árbol y unifica componentes en un DAG de commit
+
 DAG resultante para commit bien formado:
     {'accion': str, 'tipo': str, 'objeto': str, 'modulo': str}
 
@@ -145,6 +150,14 @@ def _extraer_accion(nodo: Nodo) -> dict:
         elif hijo.etiqueta == 'OBJETO':
             texto = _texto_frase(hijo)
             dag = unificar(dag, {'objeto': texto}) or dag
+        elif hijo.etiqueta == 'ACCION':
+            # Producción compuesta: VERBO OBJETO CONJ ACCION
+            sub = _extraer_accion(hijo)
+            merged = unificar(dag, sub)
+            if merged is None:
+                # Conflicto → dos acciones distintas en un mismo ACCION
+                return {'estructura': 'accion_compuesta', 'partes': [dag, sub]}
+            dag = merged
     return dag
 
 

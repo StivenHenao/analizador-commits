@@ -1,102 +1,118 @@
 """
-Analizador sintáctico CYK para mensajes de commit de git.
-Construye árboles de derivación a partir de una secuencia de tokens
-usando la gramática definida en grammar.py.
+Parser recursivo descendente para mensajes de commit en español.
 
-Integrantes:
-  Stiven Henao
-  Juan José Gallego
-  Juan Sebastián Gomez
+Implementa parse_todos() de Clase 6: retorna todos los árboles posibles.
+- 0 árboles → mensaje malformado (Caso 2)
+- 1 árbol   → mensaje bien formado (Caso 1)
+- 2+ árboles → ambigüedad detectada (Caso 3)
 """
 
-from __future__ import annotations
-from dataclasses import dataclass, field
+import sys
+sys.stdout.reconfigure(encoding="utf-8")
+
+from grammar import GRAMATICA
+from tokenizer import tokenizar
 
 
-@dataclass
+# ---------------------------------------------------------------------------
+# Nodo — árbol de derivación
+# ---------------------------------------------------------------------------
+
 class Nodo:
-    """Nodo de un árbol de derivación (parse tree).
+    def __init__(self, etiqueta, hijos=None):
+        self.etiqueta = etiqueta
+        self.hijos = hijos if hijos else []
 
-    Atributos:
-        etiqueta : símbolo de la gramática (terminal o no terminal).
-        hijos    : nodos hijos; lista vacía si es hoja terminal.
-    """
-
-    etiqueta: str
-    hijos: list["Nodo"] = field(default_factory=list)
-
-    def es_hoja(self) -> bool:
+    def es_hoja(self):
         return len(self.hijos) == 0
 
-    def mostrar(self, nivel=0):
-        sangria = "  " * nivel
-        resultado = sangria + self.etiqueta + "\n"
-        for hijo in self.hijos:
-            resultado += hijo.mostrar(nivel + 1)
-        return resultado
+    def mostrar(self, nivel=0, prefijo="", es_ultimo=True):
+        conector = "└── " if es_ultimo else "├── "
+        linea = prefijo + (conector if nivel > 0 else "") + self.etiqueta + "\n"
+        prefijo_hijo = prefijo + ("    " if es_ultimo else "│   ") if nivel > 0 else ""
+        for i, hijo in enumerate(self.hijos):
+            ultimo = (i == len(self.hijos) - 1)
+            linea += hijo.mostrar(nivel + 1, prefijo_hijo, ultimo)
+        return linea
 
-    def __repr__(self) -> str:
-        return f"Nodo({self.etiqueta!r}, hijos={len(self.hijos)})"
+    def __repr__(self):
+        return self.mostrar()
 
 
 # ---------------------------------------------------------------------------
-# Parsing con memoización — admite gramáticas con producciones de largo
-# arbitrario (no requiere FNC).
+# parse_todos
 # ---------------------------------------------------------------------------
 
-def parse_todos(
-    tokens: list[tuple[str, str]],
-    gramatica: dict,
-    simbolo_inicial: str = "COMMIT",
-) -> list[Nodo]:
+def parse_todos(simbolo, tokens, pos, gramatica):
     """
-    Retorna todos los árboles de derivación válidos para tokens bajo gramatica.
-
-    tokens          : lista de (palabra, categoria) producida por tokenizar()
-    gramatica       : diccionario {NoTerminal: [[símbolos], ...]}
-    simbolo_inicial : raíz del árbol que se busca
+    Retorna lista de (Nodo, pos_final) para todas las derivaciones posibles
+    del símbolo desde la posición pos.
     """
-    categorias = [cat for _, cat in tokens]
-    n = len(categorias)
-    memo: dict = {}
+    # Caso terminal: símbolo es una categoría que no aparece en la gramática
+    if simbolo not in gramatica:
+        if pos < len(tokens) and tokens[pos][1] == simbolo:
+            palabra, cat = tokens[pos]
+            hoja = Nodo(f"{palabra}  [{cat}]")
+            return [(hoja, pos + 1)]
+        return []
 
-    def _match(prod: list, inicio: int, fin: int):
-        """Genera todas las listas de hijos que cubren [inicio, fin) para prod."""
-        if not prod:
-            if inicio == fin:
-                yield []
-            return
-        primer, resto = prod[0], prod[1:]
-        for corte in range(inicio + 1, fin - len(resto) + 1):
-            for izq in _expand(primer, inicio, corte):
-                for cola in _match(resto, corte, fin):
-                    yield [izq] + cola
+    resultados = []
+    for produccion in gramatica[simbolo]:
+        # candidatos acumula (lista_de_hijos, posicion_actual)
+        candidatos = [([], pos)]
+        for sub in produccion:
+            nuevos = []
+            for hijos, p in candidatos:
+                for hijo, p2 in parse_todos(sub, tokens, p, gramatica):
+                    nuevos.append((hijos + [hijo], p2))
+            candidatos = nuevos
+            if not candidatos:
+                break
+        for hijos, p_final in candidatos:
+            resultados.append((Nodo(simbolo, hijos), p_final))
 
-    def _expand(simbolo: str, inicio: int, fin: int) -> list[Nodo]:
-        key = (simbolo, inicio, fin)
-        if key in memo:
-            return memo[key]
-        memo[key] = []  # centinela anti-recursión infinita
-        resultado: list[Nodo] = []
-
-        if simbolo in gramatica:
-            for prod in gramatica[simbolo]:
-                for hijos in _match(prod, inicio, fin):
-                    resultado.append(Nodo(simbolo, hijos))
-        elif inicio + 1 == fin and categorias[inicio] == simbolo:
-            resultado.append(Nodo(simbolo, [Nodo(tokens[inicio][0])]))
-
-        memo[key] = resultado
-        return resultado
-
-    return _expand(simbolo_inicial, 0, n)
+    return resultados
 
 
-def parsear(
-    tokens: list[tuple[str, str]],
-    gramatica: dict,
-    simbolo_inicial: str = "COMMIT",
-) -> Nodo | None:
-    """Retorna el primer árbol válido, o None si la entrada no es reconocida."""
-    arboles = parse_todos(tokens, gramatica, simbolo_inicial)
-    return arboles[0] if arboles else None
+# ---------------------------------------------------------------------------
+# API pública
+# ---------------------------------------------------------------------------
+
+def parsear(mensaje: str) -> list[Nodo]:
+    """
+    Recibe un mensaje de commit en texto libre y retorna la lista de
+    árboles de derivación completos.
+    """
+    tokens = tokenizar(mensaje)
+    todos = parse_todos("COMMIT", tokens, 0, GRAMATICA)
+    return [arbol for arbol, pos in todos if pos == len(tokens)]
+
+
+# ---------------------------------------------------------------------------
+# CLI / prueba rápida
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    casos = [
+        "agrega validación de correo en el módulo de registro",
+        "corrige error",
+        "actualiza estilos y corrige bug en login",
+    ]
+
+    for msg in casos:
+        arboles = parsear(msg)
+        print("=" * 60)
+        print(f"Entrada: \"{msg}\"")
+        print(f"Tokens:  {[(p, c) for p, c in tokenizar(msg)]}")
+        print(f"Árboles encontrados: {len(arboles)}")
+
+        if len(arboles) == 0:
+            print("\n  [MALFORMADO] El parser no encontró ninguna derivación.")
+        elif len(arboles) == 1:
+            print("\n  [BIEN FORMADO] Un único árbol de derivación:\n")
+            print(arboles[0].mostrar())
+        else:
+            print(f"\n  [AMBIGUO] {len(arboles)} interpretaciones posibles:\n")
+            for i, arbol in enumerate(arboles, 1):
+                print(f"  --- Árbol {i} ---")
+                print(arbol.mostrar())
