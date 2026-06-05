@@ -1,11 +1,6 @@
 """
 Extractor de componentes semánticos de un árbol de derivación.
 
-Implementa DCG/Unificación del estilo de Ejercicio_DCGs.py:
-- unificar()     → misma función de la profesora, aplicada a componentes de commit
-- LEXICO_VERBOS  → DAG de cada verbo: {accion, tipo}
-- extraer()      → recorre el árbol y unifica componentes en un DAG de commit
-
 DAG resultante para commit bien formado:
     {'accion': str, 'tipo': str, 'objeto': str, 'modulo': str}
 

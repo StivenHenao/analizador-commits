@@ -1,7 +1,6 @@
 """
 Parser recursivo descendente para mensajes de commit en español.
 
-Implementa parse_todos() de Clase 6: retorna todos los árboles posibles.
 - 0 árboles → mensaje malformado (Caso 2)
 - 1 árbol   → mensaje bien formado (Caso 1)
 - 2+ árboles → ambigüedad detectada (Caso 3)
